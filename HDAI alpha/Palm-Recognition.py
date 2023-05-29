@@ -5,12 +5,10 @@ import pyautogui
 import tkinter as tk
 from pynput import keyboard
 
-pTime=0
-pyautogui.FAILSAFE = False
-
-
-# Global variable to track the input pause state
-is_paused = False
+# global settings, comment to disable them
+is_paused = False               # sets the code state to running (for mouse input)
+pTime=0                         # for calculating fps, no change needed
+#pyautogui.FAILSAFE = False     # if enabled, terminates the program when your hand/palm goes to the corner of the screen
 
 # Function to handle keyboard events
 def on_key_press(key):
@@ -19,25 +17,22 @@ def on_key_press(key):
         is_paused = not is_paused
         if is_paused:
             print("Input paused")
-
         else:
             print("Input resumed")
-    elif key == keyboard.Key.enter:
 
+    elif key == keyboard.Key.enter:
         pyautogui.click()
 
-# Set up the keyboard listener
 
+# Set up the keyboard listener
 listener = keyboard.Listener(on_press=on_key_press)
 listener.start()
 
 # Initialize OpenCV capture
 cap = cv2.VideoCapture(0)
 
-# Get screen dimensions
+# Screen Dimensions and Scaling
 screen_width, screen_height = pyautogui.size()
-
-# Set desired camera vision size
 camera_width, camera_height = screen_width, screen_height
 
 # Initialize Mediapipe hands module
@@ -45,10 +40,10 @@ mpHands = mp.solutions.hands
 hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.7)
 mpDraw = mp.solutions.drawing_utils
 
-# Variables for cursor movement
-cursor_speed = 100  # Adjust the cursor speed as needed (lower value for faster movement)
-cursor_x = 0
-cursor_y = 0
+# Variables for cursor movement - linear smoothening - disabled by default
+#cursor_speed = 100  # Adjust the cursor speed as needed (lower value for faster movement)
+#cursor_x = 0
+#cursor_y = 0
 
 # Function to toggle camera feed display
 def toggle_camera_feed():
@@ -59,28 +54,23 @@ def toggle_camera_feed():
         print("hi")
 
 
-# Create the Tkinter GUI
+# Tkinter Stuff
 root = tk.Tk()
 root.title("Hand Detection")
 root.geometry("300x100")
-
-# Create a checkbox for showing camera feed
 show_camera = tk.IntVar(value=1)
 camera_checkbox = tk.Checkbutton(root, text="Show Camera Feed", variable=show_camera, command=toggle_camera_feed)
 camera_checkbox.pack()
 
 # Function to start the camera feed
 def start_camera_feed():
-    # Main loop for processing the camera feed
     while True:
+
         # Read frame from the camera
         _, frame = cap.read()
-        frame = cv2.flip(frame, 1) #uncomment if youre facing towards the camera, keep it as a comment if it is a body cam
+        frame = cv2.flip(frame, 1) 
 
-        # Convert the frame to RGB for Mediapipe
         framergb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Process hand landmarks with Mediapipe
         result = hands.process(framergb)
 
         if result.multi_hand_landmarks and not is_paused:
@@ -95,14 +85,12 @@ def start_camera_feed():
             # Smoothly move the cursor to the target position
             # cursor_x += int((target_x - cursor_x) / cursor_speed)
             # cursor_y += int((target_y - cursor_y) / cursor_speed)
-            pyautogui.moveTo(target_x, target_y)
+            pyautogui.moveTo(target_x, target_y)     # change target_x, targer_y to cursor_x and cursor_y to enable smoothening
 
         # Display the frame in the camera feed window if enabled
         if show_camera.get() == 1:
             cv2.imshow("Camera Feed", frame)
             cv2.setWindowProperty("Camera Feed", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-
-            # ...
 
         # Check for 'q' key press to exit the program
         if cv2.waitKey(1) == ord('q'):
@@ -112,9 +100,7 @@ def start_camera_feed():
     cap.release()
     cv2.destroyAllWindows()
 
-# Button to start the camera feed
-start_button = tk.Button(root, text="Start Camera Feed", command=start_camera_feed)
+# tkinter stuff again
+start_button = tk.Button(root, text="Execute", command=start_camera_feed)
 start_button.pack()
-
-# Start the Tkinter event loop
 root.mainloop()
