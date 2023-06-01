@@ -5,12 +5,48 @@ import pyautogui
 import tkinter as tk
 from pynput import keyboard
 
-# global settings, comment to disable them
-is_paused = False               # sets the code state to running (for mouse input)
-pTime=0                         # for calculating fps, no change needed
-#pyautogui.FAILSAFE = False     # if enabled, terminates the program when your hand/palm goes to the corner of the screen
+# I have taken help from ChatGPT, but the code isn't in its entirety
+# Bugs may prevail, dont squash em, theyre upcoming features
+# For now try with the camera on only
 
-# Function to handle keyboard events
+# Global settings, comment to disable them
+is_paused = False               # sets the code state to running (for mouse input)
+pTime = 0                       # for calculating fps, no change needed
+pyautogui.FAILSAFE = False      # if enabled, terminates the program when your hand/palm goes to the corner of the screen
+screen_width, screen_height = pyautogui.size()              # screen and camera dimensions
+camera_width, camera_height = screen_width, screen_height
+sign_image = cv2.imread("sign.png")  # Replace "sign.png" with the path to your sign image
+
+# Initialize OpenCV capture
+cap = cv2.VideoCapture(0)
+cap.set(3, camera_width)
+cap.set(4, camera_height)
+
+# Mediapipe hands module
+mpHands = mp.solutions.hands
+hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.7)
+mpDraw = mp.solutions.drawing_utils
+
+# Variables for cursor movement - linear smoothening - disabled by default
+# cursor_speed = 100  # Adjust the cursor speed as needed (lower value for faster movement)
+# cursor_x = 0
+# cursor_y = 0
+
+# Hand State
+def is_hand_open(hand_landmarks):
+    # Define the landmark points for an open hand gesture
+    open_landmark_ids = [mpHands.HandLandmark.THUMB_TIP,
+                         mpHands.HandLandmark.INDEX_FINGER_TIP,
+                         mpHands.HandLandmark.MIDDLE_FINGER_TIP,
+                         mpHands.HandLandmark.RING_FINGER_TIP,
+                         mpHands.HandLandmark.PINKY_TIP]
+
+    for landmark_id in open_landmark_ids:
+        if hand_landmarks.landmark[landmark_id].y > hand_landmarks.landmark[mpHands.HandLandmark.WRIST].y:
+            return False
+    return True
+
+# Keyboard events
 def on_key_press(key):
     global is_paused
     if key == keyboard.Key.space:
@@ -19,40 +55,20 @@ def on_key_press(key):
             print("Input paused")
         else:
             print("Input resumed")
-
     elif key == keyboard.Key.enter:
         pyautogui.click()
 
-
-# Set up the keyboard listener
+# Keyboard listener
 listener = keyboard.Listener(on_press=on_key_press)
 listener.start()
 
-# Initialize OpenCV capture
-cap = cv2.VideoCapture(0)
-
-# Screen Dimensions and Scaling
-screen_width, screen_height = pyautogui.size()
-camera_width, camera_height = screen_width, screen_height
-
-# Initialize Mediapipe hands module
-mpHands = mp.solutions.hands
-hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.7)
-mpDraw = mp.solutions.drawing_utils
-
-# Variables for cursor movement - linear smoothening - disabled by default
-#cursor_speed = 100  # Adjust the cursor speed as needed (lower value for faster movement)
-#cursor_x = 0
-#cursor_y = 0
-
-# Function to toggle camera feed display
+# Camera feed display
 def toggle_camera_feed():
     if show_camera.get() == 1:
         cv2.namedWindow("Camera Feed", cv2.WINDOW_NORMAL)
         cv2.setWindowProperty("Camera Feed", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     else:
         print("hi")
-
 
 # Tkinter Stuff
 root = tk.Tk()
@@ -62,32 +78,68 @@ show_camera = tk.IntVar(value=1)
 camera_checkbox = tk.Checkbutton(root, text="Show Camera Feed", variable=show_camera, command=toggle_camera_feed)
 camera_checkbox.pack()
 
-# Function to start the camera feed
+# Cooldown settings
+cooldown_duration = 2  # Cooldown duration in seconds
+cooldown_start_time = time.time() - cooldown_duration
+
 def start_camera_feed():
+    global cooldown_start_time  # Declare the variable as global
+    hand_open_state = False
+
     while True:
+        success, frame = cap.read()
+        if not success:
+            break
 
-        # Read frame from the camera
-        _, frame = cap.read()
-        frame = cv2.flip(frame, 1) 
+        # Frame Operations
+        frame = cv2.flip(frame, 1)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = hands.process(frame_rgb)
 
-        framergb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        result = hands.process(framergb)
+        # Draw landmarks and gestures on the frame
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                # Get the landmarks for the first detected hand - keep it disabled
+                #mpDraw.draw_landmarks(frame, hand_landmarks, mpHands.HAND_CONNECTIONS)
+                #hand_landmarks = results.multi_hand_landmarks[0] #disable, use only for testing
 
-        if result.multi_hand_landmarks and not is_paused:
-            # Get the landmarks for the first detected hand
-            hand_landmarks = result.multi_hand_landmarks[0]
+                # Calculate Box Coordinates
+                landmark_x = [landmark.x for landmark in hand_landmarks.landmark]
+                landmark_y = [landmark.y for landmark in hand_landmarks.landmark]
+                min_x = min(landmark_x)
+                max_x = max(landmark_x)
+                min_y = min(landmark_y)
+                max_y = max(landmark_y)
+                x = int(min_x * frame.shape[1])
+                y = int(min_y * frame.shape[0])
+                w = int((max_x - min_x) * frame.shape[1])
+                h = int((max_y - min_y) * frame.shape[0])
+                #cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2) # a box around the hand
 
-            # Example: Use pyautogui to move the mouse based on hand coordinates
-            # You can customize this according to your game's input requirements
-            target_x = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].x * screen_width)
-            target_y = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height)
+                # Check if hand is open
+                if is_hand_open(hand_landmarks):
+                    current_time = time.time()
+                    if not hand_open_state and current_time - cooldown_start_time >= cooldown_duration:
+                        hand_open_state = True
+                        cooldown_start_time = current_time
+                        print("Hand Opened")
+                        cv2.putText(frame, "Hand Open", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        sign_height, sign_width, _ = sign_image.shape
+                        resized_sign = cv2.resize(sign_image, (w, h))
+                        frame[y:y + h, x:x + w] = resized_sign
 
-            # Smoothly move the cursor to the target position
-            # cursor_x += int((target_x - cursor_x) / cursor_speed)
-            # cursor_y += int((target_y - cursor_y) / cursor_speed)
-            pyautogui.moveTo(target_x, target_y)     # change target_x, targer_y to cursor_x and cursor_y to enable smoothening
+                else:
+                    hand_open_state = False
 
-        # Display the frame in the camera feed window if enabled
+                # Get the index finger tip position
+                target_x = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].x * screen_width)
+                target_y = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height)
+                
+                # Cursor Movement
+                pyautogui.moveTo(target_x, target_y)
+                # cv2.circle(frame, (target_x, target_y), 5, (0, 255, 0), -1) #cursor location, disable for better fps
+
+        # Camera enabled 
         if show_camera.get() == 1:
             cv2.imshow("Camera Feed", frame)
             cv2.setWindowProperty("Camera Feed", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -100,7 +152,9 @@ def start_camera_feed():
     cap.release()
     cv2.destroyAllWindows()
 
-# tkinter stuff again
+# Start the camera feed through tkinter
 start_button = tk.Button(root, text="Execute", command=start_camera_feed)
+
+# tkinter stuff again
 start_button.pack()
 root.mainloop()
