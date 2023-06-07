@@ -133,7 +133,7 @@ def start_camera_feed():
                             cv2.putText(frame, "Hand Open", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
                             # Sign Image Code
-                            if h > 0 and w > 0:
+                            if h > 0 or w > 0:
                                 sign_height, sign_width, _ = sign_image.shape
                                 resized_sign = cv2.resize(sign_image, (w, h))
                                 frame[y:y + h, x:x + w] = resized_sign
