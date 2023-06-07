@@ -72,7 +72,7 @@ def toggle_camera_feed():
         cv2.namedWindow("Camera Feed", cv2.WINDOW_NORMAL)
         cv2.setWindowProperty("Camera Feed", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     else:
-        print("hi")
+        print("Camera feed off")
 
 
 # Tkinter Stuff
@@ -145,7 +145,7 @@ def start_camera_feed():
                     # Get the index fingertip position
                     target_x = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].x * screen_width)
                     target_y = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height)
-                    print(target_y, target_x)
+                    #print(target_y, target_x)      # prints index finger's tip (pointer)'s location wrt your screen
 
                     # Cursor Movement 
                     pyautogui.moveTo(target_x, target_y)
