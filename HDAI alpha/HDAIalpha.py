@@ -12,7 +12,7 @@ from pynput import keyboard
 # Global settings, comment to disable them
 is_paused = False  # sets the code state to running (for mouse input)
 pTime = 0  # for calculating fps, no change needed
-#pyautogui.FAILSAFE = False  # if enabled, terminates the program when your hand/palm goes to the corner of the screen
+# pyautogui.FAILSAFE = False  # if enabled, terminates the program when your hand/palm goes to the corner of the screen
 screen_width, screen_height = pyautogui.size()  # screen and camera dimensions
 camera_width, camera_height = screen_width, screen_height
 sign_image = cv2.imread("sign.png")  # Replace "sign.png" with the path to your sign image
@@ -106,7 +106,7 @@ def start_camera_feed():
             # Landmarks and Gestures
             if results.multi_hand_landmarks:
                 for hand_landmarks in results.multi_hand_landmarks:
-                    # Get the landmarks for the first detected hand - keep it disabled
+                    #   Get the landmarks for the first detected hand - keep it disabled
                     # mpDraw.draw_landmarks(frame, hand_landmarks, mpHands.HAND_CONNECTIONS)
                     # hand_landmarks = results.multi_hand_landmarks[0] #disable, use only for testing
 
@@ -123,14 +123,29 @@ def start_camera_feed():
                     h = int((max_y - min_y) * frame.shape[0])
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)  # a box around the hand
 
-                    # Check if hand is open
-                    if is_hand_open(hand_landmarks):
+                    # Check if thumb and index finger meet
+                    thumb_tip = hand_landmarks.landmark[mpHands.HandLandmark.THUMB_TIP]
+                    index_finger_tip = hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP]
+                    thumb_tip_x = int(thumb_tip.x * frame.shape[1])
+                    thumb_tip_y = int(thumb_tip.y * frame.shape[0])
+                    index_finger_tip_x = int(index_finger_tip.x * frame.shape[1])
+                    index_finger_tip_y = int(index_finger_tip.y * frame.shape[0])
+
+                    # Distance between thumb and index fingertips
+                    distance = ((thumb_tip_x - index_finger_tip_x) ** 2 + (
+                                thumb_tip_y - index_finger_tip_y) ** 2) ** 0.5
+
+                    if distance < 50:  # Adjust the distance threshold as needed
                         current_time = time.time()
                         if not hand_open_state and current_time - cooldown_start_time >= cooldown_duration:
                             hand_open_state = True
                             cooldown_start_time = current_time
-                            print("Hand Opened")
-                            cv2.putText(frame, "Hand Open", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                            print("Thumb and Index Finger Meet")
+				    # pyautogui.click() # experimental feature, mouse click
+
+                            cv2.putText(frame, "Thumb and Index Finger Meet", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.5, (0, 255, 0), 2)
 
                             # Sign Image Code
                             if h > 0 or w > 0:
@@ -145,11 +160,11 @@ def start_camera_feed():
                     # Get the index fingertip position
                     target_x = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].x * screen_width)
                     target_y = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height)
-                    #print(target_y, target_x)      # prints index finger's tip (pointer)'s location wrt your screen
+                    # print(target_y, target_x)      # prints index finger's tip's location wrt your screen
 
-                    # Cursor Movement 
+                    # Cursor Movement
                     pyautogui.moveTo(target_x, target_y)
-                    # cv2.circle(frame, (target_x, target_y), 5, (0, 255, 0), -1) #cursor location, disable for better fps
+                    # cv2.circle(frame, (target_x, target_y), 5, (0, 255, 0), -1)       # cursor location
 
             # Camera enabled
             if show_camera.get() == 1:
