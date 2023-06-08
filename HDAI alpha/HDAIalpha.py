@@ -137,15 +137,15 @@ def start_camera_feed():
 
                     if distance < 50:  # Adjust the distance threshold as needed
                         current_time = time.time()
+                        cv2.putText(frame, "Thumb and Index Finger Meet", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5, (0, 255, 0), 2)
+
                         if not hand_open_state and current_time - cooldown_start_time >= cooldown_duration:
                             hand_open_state = True
                             cooldown_start_time = current_time
 
                             print("Thumb and Index Finger Meet")
-				    # pyautogui.click() # experimental feature, mouse click
-
-                            cv2.putText(frame, "Thumb and Index Finger Meet", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.5, (0, 255, 0), 2)
+                            # pyautogui.click() # experimental feature, mouse click
 
                             # Sign Image Code
                             if h > 0 or w > 0:
