@@ -135,6 +135,10 @@ def start_camera_feed():
                     distance = ((thumb_tip_x - index_finger_tip_x) ** 2 + (
                                 thumb_tip_y - index_finger_tip_y) ** 2) ** 0.5
 
+                    # Scroll settings
+                    scroll_amount = 0
+                    scroll_amount = int(distance * 0.1)
+
                     if distance < 50:  # Adjust the distance threshold as needed
                         current_time = time.time()
                         cv2.putText(frame, "Thumb and Index Finger Meet", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
@@ -148,12 +152,19 @@ def start_camera_feed():
                             # pyautogui.click() # experimental feature, mouse click
 
                             # Sign Image Code
-                            if h > 0 or w > 0:
-                                sign_height, sign_width, _ = sign_image.shape
-                                resized_sign = cv2.resize(sign_image, (w, h))
-                                frame[y:y + h, x:x + w] = resized_sign
+                            if h > 0 and w > 0:
+                                # Calculate the center point of the thumb and index finger landmarks
+                                thumb_center = (int(thumb_tip_x), int(thumb_tip_y))
+                                index_center = (int(index_finger_tip_x), int(index_finger_tip_y))
+
+                                # Calculate the radius of the circle based on the distance between thumb and index fingertips
+                                radius = int(distance / 2)
+
+                                # Draw a red circle on the frame at the center of the thumb and index finger landmarks
+                                cv2.circle(frame, thumb_center, radius, (0, 0, 255), cv2.FILLED)
+                                cv2.circle(frame, index_center, radius, (0, 0, 255), cv2.FILLED)
                             else:
-                                print("resize issues")
+                                print("Resize issues")
                     else:
                         hand_open_state = False
 
