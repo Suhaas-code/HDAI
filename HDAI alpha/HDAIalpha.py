@@ -9,13 +9,19 @@ from pynput import keyboard
 # Bugs may prevail, don't squash em, they're upcoming features
 # For now try with the camera on only
 
+#####################
 # Global settings, comment to disable them
 is_paused = False  # sets the code state to running (for mouse input)
 pTime = 0  # for calculating fps, no change needed
 # pyautogui.FAILSAFE = False  # if enabled, terminates the program when your hand/palm goes to the corner of the screen
 screen_width, screen_height = pyautogui.size()  # screen and camera dimensions
 camera_width, camera_height = screen_width, screen_height
-sign_image = cv2.imread("sign.png")  # Replace "sign.png" with the path to your sign image
+#####################
+# Few Settings I couldn't mention them here as their respective dependencies don't allow them
+# Click on gesture : when thumb and index finger meet : ln 154
+# Scrolling guide : In commit notes or : ln 171
+# Scrolling Sensitivity : ln 181
+
 
 # Initialize OpenCV capture
 cap = cv2.VideoCapture(0)
@@ -135,10 +141,6 @@ def start_camera_feed():
                     distance = ((thumb_tip_x - index_finger_tip_x) ** 2 + (
                                 thumb_tip_y - index_finger_tip_y) ** 2) ** 0.5
 
-                    # Scroll settings
-                    scroll_amount = 0
-                    scroll_amount = int(distance * 0.1)
-
                     if distance < 50:  # Adjust the distance threshold as needed
                         current_time = time.time()
                         cv2.putText(frame, "Thumb and Index Finger Meet", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
@@ -151,16 +153,14 @@ def start_camera_feed():
                             print("Thumb and Index Finger Meet")
                             # pyautogui.click() # experimental feature, mouse click
 
-                            # Sign Image Code
+                            # Sign Code : If thumb and index finger meet
                             if h > 0 and w > 0:
-                                # Calculate the center point of the thumb and index finger landmarks
+                                # Center point of the thumb and index finger landmarks
                                 thumb_center = (int(thumb_tip_x), int(thumb_tip_y))
                                 index_center = (int(index_finger_tip_x), int(index_finger_tip_y))
 
-                                # Calculate the radius of the circle based on the distance between thumb and index fingertips
+                                # Shows if the thumb and index finger meet
                                 radius = int(distance / 2)
-
-                                # Draw a red circle on the frame at the center of the thumb and index finger landmarks
                                 cv2.circle(frame, thumb_center, radius, (0, 0, 255), cv2.FILLED)
                                 cv2.circle(frame, index_center, radius, (0, 0, 255), cv2.FILLED)
                             else:
@@ -168,7 +168,21 @@ def start_camera_feed():
                     else:
                         hand_open_state = False
 
-                    # Get the index fingertip position
+                    # Scroll Condition : Pinky finger should be opened but to avoid errors,
+                    # additional condition index finger should be lower than the pinky finger,
+                    # invert the hand upside down to reproduce the desired scrolling
+
+                    pinky_tip_y = int(hand_landmarks.landmark[mpHands.HandLandmark.PINKY_TIP].y * screen_height)
+                    print(pinky_tip_y)
+                    is_pinky_lifted = pinky_tip_y < hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height
+
+                    # Scroll feature
+                    if is_pinky_lifted:
+                        scroll_amount = int(distance * -0.2)  # Adjust the scroll sensitivity as needed
+                        pyautogui.scroll(scroll_amount)
+                        cv2.putText(frame, "Scrolling", (x, y - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+                    # Index Finger Location
                     target_x = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].x * screen_width)
                     target_y = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height)
                     # print(target_y, target_x)      # prints index finger's tip's location wrt your screen
