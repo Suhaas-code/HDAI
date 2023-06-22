@@ -19,3 +19,10 @@ pynput
 8. Use the spacebar key to pause/resume the input processing.
 9. Use the enter key to trigger a mouse click action.
 10. Press 'q' in the camera feed window or close the window to exit the application. 
+
+### Update :
+
+**HDAI Apollo:  A GUI-less version, always up and running**,
+project docs will get updated once a stable version is achieved.
+
+HDAI X, an upcoming project version by [@aksaha](https://github.com/aksahaha) will also be updated in a while
