@@ -25,4 +25,4 @@ pynput
 **HDAI Apollo:  A GUI-less version, always up and running**,
 project docs will get updated once a stable version is achieved.
 
-HDAI X, an upcoming project version by [@aksaha](https://github.com/aksahaha) will also be updated in a while
+HDAI Vega, an upcoming project version by [@aksaha](https://github.com/aksahaha) will also be updated in a while
