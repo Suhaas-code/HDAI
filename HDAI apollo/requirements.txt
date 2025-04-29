@@ -3,3 +3,5 @@ mediapipe
 pyautogui
 numpy
 screen-brightness-control
+scikit-learn
+pandas
