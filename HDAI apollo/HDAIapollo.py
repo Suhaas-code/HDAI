@@ -1,161 +1,139 @@
 import cv2
 import mediapipe as mp
-import time
 import pyautogui
-from pynput import keyboard
+import tkinter as tk
+import os
+import platform
+import numpy as np
 
-# Global settings, comment to disable them
-is_paused = False  # sets the code state to running (for mouse input)
-pTime = 0  # for calculating fps, no change needed
-# pyautogui.FAILSAFE = False  # if enabled, terminates the program when your hand/palm goes to the corner of the screen
-screen_width, screen_height = pyautogui.size()  # screen and camera dimensions
+try:
+    import screen_brightness_control as sbc
+except ImportError:
+    sbc = None
+
+is_paused = False
+screen_width, screen_height = pyautogui.size()
 camera_width, camera_height = screen_width, screen_height
-show_camera = 1
 
-
-# Initialize OpenCV capture
 cap = cv2.VideoCapture(0)
 cap.set(3, camera_width)
 cap.set(4, camera_height)
 
-# Mediapipe hands module
 mpHands = mp.solutions.hands
 hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.7)
 mpDraw = mp.solutions.drawing_utils
 
-
-# Variables for cursor movement - linear smoothening - disabled by default
-# cursor_speed = 100  # Adjust the cursor speed as needed (lower value for faster movement)
-# cursor_x = 0
-# cursor_y = 0
-
-# Keyboard events
-def on_key_press(key):
-    global is_paused
-    if key == keyboard.Key.space:
-        is_paused = not is_paused
-        if is_paused:
-            print("Input paused")
-        else:
-            print("Input resumed")
-    elif key == keyboard.Key.enter:
-        pyautogui.click()
+control_mode = "mouse"
+prev_x, prev_y = 0, 0  # Previous position for swipe detection
+prev_distance = None  # Previous pinch distance for zoom
 
 
-# Keyboard listener
-listener = keyboard.Listener(on_press=on_key_press)
-listener.start()
 
-# Cooldown settings
-cooldown_duration = 1  # Cooldown duration in seconds
-cooldown_start_time = time.time() - cooldown_duration
+def set_control_mode():
+    global control_mode
+    selected = mode_var.get()
+    modes = ["mouse", "volume", "brightness", "zoom", "swipe"]
+    control_mode = modes[selected - 1]
+    print(f"Control mode set to: {control_mode}")
 
+def adjust_brightness(level):
+    system_os = platform.system()
+    if system_os == "Windows" and sbc:
+        try:
+            sbc.set_brightness(level)
+        except Exception as e:
+            print(f"Brightness adjustment failed: {e}")
+    elif system_os == "Darwin":  # macOS
+        os.system(f"brightness {level / 100.0}")
+    else:
+        print("Brightness adjustment is not supported on this OS.")
+
+def perform_zoom(distance, prev_distance, zoom_in_threshold=15, zoom_out_threshold=15):
+    if prev_distance is not None:
+        if distance > prev_distance + zoom_in_threshold:
+            print("Zooming In")
+            pyautogui.hotkey("command", "+")
+        elif distance < prev_distance - zoom_out_threshold:
+            print("Zooming Out")
+            pyautogui.hotkey("command", "-")
+    return distance
+
+def perform_swipe(index_x, prev_x, swipe_threshold=50):
+    if prev_x is not None:
+        dx = index_x - prev_x
+        if dx > swipe_threshold:
+            print("Swiped Right")
+            pyautogui.hotkey("command", "right")
+        elif dx < -swipe_threshold:
+            print("Swiped Left")
+            pyautogui.hotkey("command", "left")
+    return index_x
 
 def start_camera_feed():
-    global cooldown_start_time
-
+    global prev_x, prev_y, prev_distance
+    system_os = platform.system()
     while True:
         if not is_paused:
             success, frame = cap.read()
             if not success:
                 break
 
-            # Frame Operations
             frame = cv2.flip(frame, 1)
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = hands.process(frame_rgb)
 
-            # Landmarks and Gestures
             if results.multi_hand_landmarks:
                 for hand_landmarks in results.multi_hand_landmarks:
-                    # Calculate Box Coordinates
-                    landmark_x = [landmark.x for landmark in hand_landmarks.landmark]
-                    landmark_y = [landmark.y for landmark in hand_landmarks.landmark]
-                    min_x = min(landmark_x)
-                    max_x = max(landmark_x)
-                    min_y = min(landmark_y)
-                    max_y = max(landmark_y)
-                    x = int(min_x * frame.shape[1])
-                    y = int(min_y * frame.shape[0])
-                    w = int((max_x - min_x) * frame.shape[1])
-                    h = int((max_y - min_y) * frame.shape[0])
-                    # cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)  # a box around the hand
-                    t = 637
-                    u = 957
-
-                    cv2.putText(frame, "Press q to quit and space to pause the operation", (t, u + 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
-                    print("press space bar to pause")
-                    # Check if thumb and index finger meet
+                    index_tip = hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP]
                     thumb_tip = hand_landmarks.landmark[mpHands.HandLandmark.THUMB_TIP]
-                    index_finger_tip = hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP]
-                    thumb_tip_x = int(thumb_tip.x * frame.shape[1])
-                    thumb_tip_y = int(thumb_tip.y * frame.shape[0])
-                    index_finger_tip_x = int(index_finger_tip.x * frame.shape[1])
-                    index_finger_tip_y = int(index_finger_tip.y * frame.shape[0])
+                    index_x, index_y = int(index_tip.x * frame.shape[1]), int(index_tip.y * frame.shape[0])
+                    thumb_x, thumb_y = int(thumb_tip.x * frame.shape[1]), int(thumb_tip.y * frame.shape[0])
+                    distance = ((thumb_x - index_x) ** 2 + (thumb_y - index_y) ** 2) ** 0.5
 
-                    # Distance between thumb and index fingertips
-                    distance = ((thumb_tip_x - index_finger_tip_x) ** 2 + (
-                            thumb_tip_y - index_finger_tip_y) ** 2) ** 0.5
+                    if control_mode == "mouse":
+                        pyautogui.moveTo(index_x, index_y)
 
-                    if distance < 50:  # Adjust the distance threshold as needed
-                        current_time = time.time()
-                        cv2.putText(frame, "Thumb and Index Finger Meet", (t, u - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    elif control_mode == "volume":
+                        volume_level = min(int(distance), 100)
+                        print(f"Volume set to: {volume_level}")
+                        os.system(f"osascript -e 'set volume output volume {volume_level}'")
 
-                        if current_time - cooldown_start_time >= cooldown_duration:
-                            cooldown_start_time = current_time
+                    elif control_mode == "brightness":
+                        brightness_level = min(int(distance), 100)
+                        print(f"Brightness set to: {brightness_level}")
+                        adjust_brightness(brightness_level)
 
-                            print("Thumb and Index Finger Meet")
-                            # pyautogui.click() # experimental feature, mouse click
+                    elif control_mode == "zoom":
+                        prev_distance = perform_zoom(distance, prev_distance)
 
-                            # Sign Code : If thumb and index finger meet
-                            if h > 0 and w > 0:
-                                # Center point of the thumb and index finger landmarks
-                                thumb_center = (int(thumb_tip_x), int(thumb_tip_y))
-                                index_center = (int(index_finger_tip_x), int(index_finger_tip_y))
+                    elif control_mode == "swipe":
+                        prev_x = perform_swipe(index_x, prev_x)
+                        
+                    cv2.circle(frame, (index_x, index_y), 10, (0, 255, 0), -1)
 
-                                # Shows if the thumb and index finger meet
-                                radius = int(distance / 2)
-                                cv2.circle(frame, thumb_center, radius, (0, 0, 255), cv2.FILLED)
-                                cv2.circle(frame, index_center, radius, (0, 0, 255), cv2.FILLED)
-                            else:
-                                print("Resize issues")
-
-                    # Scroll Condition : Pinky finger should be opened but to avoid errors,
-                    # additional condition index finger should be lower than the pinky finger,
-                    # invert the hand upside down to reproduce the desired scrolling
-                    pinky_tip_y = int(hand_landmarks.landmark[mpHands.HandLandmark.PINKY_TIP].y * screen_height)
-                    is_pinky_lifted = pinky_tip_y < hand_landmarks.landmark[
-                        mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height
-
-                    # Scroll feature
-                    if is_pinky_lifted:
-                        scroll_amount = int(distance * -0.2)  # Adjust the scroll sensitivity as needed
-                        pyautogui.scroll(scroll_amount)
-                        #print(scroll_amount)
-                        cv2.putText(frame, "Scrolling", (t, u - 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-
-                    # Index Finger Location
-                    target_x = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].x * screen_width)
-                    target_y = int(hand_landmarks.landmark[mpHands.HandLandmark.INDEX_FINGER_TIP].y * screen_height)
-                    # print(target_y, target_x)      # prints index finger's tip's location wrt your screen
-
-                    # Cursor Movement
-                    pyautogui.moveTo(target_x, target_y)
-                    # cv2.circle(frame, (target_x, target_y), 5, (0, 255, 0), -1)       # cursor location
-
-            # Camera enabled
-            if show_camera == 1:
+            if show_camera.get() == 1:
                 cv2.imshow("Camera Feed", frame)
-                cv2.setWindowProperty("Camera Feed", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-            # Check for 'q' key press to exit the program
             if cv2.waitKey(1) == ord('q'):
                 break
 
-    # Release the capture and close windows
     cap.release()
     cv2.destroyAllWindows()
 
+root = tk.Tk()
+root.title("Hand Gesture Control")
+root.geometry("300x350")
 
-# Start the camera feed
-start_camera_feed()
+show_camera = tk.IntVar(value=1)
+camera_checkbox = tk.Checkbutton(root, text="Show Camera Feed", variable=show_camera)
+camera_checkbox.pack()
+
+mode_var = tk.IntVar(value=1)
+modes = ["Mouse", "Volume", "Brightness", "Zoom", "Swipe"]
+for i, mode in enumerate(modes, 1):
+    tk.Radiobutton(root, text=mode, variable=mode_var, value=i, command=set_control_mode).pack()
+
+start_button = tk.Button(root, text="Start", command=start_camera_feed)
+start_button.pack()
+
+root.mainloop()
