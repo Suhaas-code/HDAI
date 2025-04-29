@@ -108,7 +108,7 @@ def start_camera_feed():
 
                     elif control_mode == "swipe":
                         prev_x = perform_swipe(index_x, prev_x)
-                        
+
                     cv2.circle(frame, (index_x, index_y), 10, (0, 255, 0), -1)
 
             if show_camera.get() == 1:
