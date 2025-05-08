@@ -1,2 +1,2 @@
-sno	primary_label	secondary_label	path
-1	TRUE	LEFT	../HDAI/HDAI apollo/images/input/test-1.jpg
+sno,primary_label,secondary_label,path
+1,TRUE,LEFT,../HDAI/HDAI apollo/images/input/test-1.jpg

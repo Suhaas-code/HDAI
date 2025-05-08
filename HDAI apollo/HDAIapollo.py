@@ -33,7 +33,6 @@ def process_hand_image(image_path):
     handedness = None
     if results.multi_handedness:
         handedness = results.multi_handedness[0].classification[0].label
-
     return hand_detected, handedness
 
 # Function to evaluate the model on the CSV file
@@ -51,11 +50,13 @@ def test_model(csv_path):
     for _, row in df.iterrows():
         print(f"Processing image {row['sno']} at {row['path']}")
         image_path = row['path']
+        print(f"Image path: {image_path}")
         actual_hand_label = 1 if row['primary_label'] == 'TRUE' else 0
         actual_handedness_label = row['secondary_label']
 
         # Process the image
         predicted_hand_label, predicted_handedness_label = process_hand_image(image_path)
+        print (f"Predicted hand: {predicted_hand_label}, Predicted handedness: {predicted_handedness_label}")
 
         if predicted_hand_label is None:
             continue  # Skip this iteration if there is an issue with the image processing
@@ -101,5 +102,5 @@ def test_model(csv_path):
     print(f"F1 Score: {f1_handedness:.4f}")
 
 # Example usage
-csv_path = "../HDAI/HDAI apollo/images/input/test_data.csv"  # Replace with your CSV path
+csv_path = "HDAI apollo/images/test.csv"  # Replace with your CSV path
 test_model(csv_path)
